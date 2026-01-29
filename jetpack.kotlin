@@ -1,0 +1,1118 @@
+/*
+ * ELDER HEALTH MONITORING APP - ULTRA COMPATIBLE VERSION
+ * Uses ONLY the most basic Material Icons (absolutely guaranteed to work)
+ *
+ * SETUP:
+ * 1. Create new "Empty Activity" Compose project
+ * 2. Replace MainActivity.kt with this file
+ * 3. Update AndroidManifest.xml (see bottom)
+ * 4. Update build.gradle.kts (see bottom)
+ * 5. Sync Gradle and Run
+ *
+ * DEMO LOGIN:
+ * Elder: elder1 / elder123
+ * Guardian: guardian1 / guard123
+ */
+
+package com.example.elderhealthmonitor
+
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import java.text.SimpleDateFormat
+import java.util.*
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            ElderHealthMonitorTheme {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    ElderHealthApp()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ElderHealthMonitorTheme(content: @Composable () -> Unit) {
+    MaterialTheme(
+        colorScheme = lightColorScheme(
+            primary = Color(0xFF6200EE),
+            secondary = Color(0xFF03DAC6),
+            tertiary = Color(0xFFFF6F00),
+            background = Color(0xFFF5F5F5),
+            surface = Color.White,
+            error = Color(0xFFB00020)
+        ),
+        content = content
+    )
+}
+
+data class User(
+    val username: String,
+    val password: String,
+    val role: UserRole,
+    val name: String
+)
+
+enum class UserRole {
+    ELDER, GUARDIAN
+}
+
+data class HealthData(
+    var waterIntake: Int = 0,
+    var steps: Int = 0,
+    var heartRate: Int = 75,
+    val emergencyContacts: MutableList<EmergencyContact> = mutableListOf()
+)
+
+data class EmergencyContact(
+    val name: String,
+    val phoneNumber: String,
+    val relationship: String
+)
+
+@Composable
+fun ElderHealthApp() {
+    var currentScreen by remember { mutableStateOf<Screen>(Screen.Login) }
+    var currentUser by remember { mutableStateOf<User?>(null) }
+    val healthData = remember { mutableStateOf(HealthData()) }
+
+    val users = remember {
+        listOf(
+            User("elder1", "elder123", UserRole.ELDER, "John Doe"),
+            User("guardian1", "guard123", UserRole.GUARDIAN, "Sarah Doe")
+        )
+    }
+
+    when (currentScreen) {
+        is Screen.Login -> {
+            LoginScreen(
+                users = users,
+                onLoginSuccess = { user ->
+                    currentUser = user
+                    currentScreen = Screen.Dashboard
+                }
+            )
+        }
+        is Screen.Dashboard -> {
+            currentUser?.let { user ->
+                DashboardScreen(
+                    user = user,
+                    healthData = healthData.value,
+                    onLogout = {
+                        currentUser = null
+                        currentScreen = Screen.Login
+                    },
+                    onUpdateWater = { healthData.value = healthData.value.copy(waterIntake = it) },
+                    onUpdateSteps = { healthData.value = healthData.value.copy(steps = it) },
+                    onUpdateHeartRate = { healthData.value = healthData.value.copy(heartRate = it) },
+                    onAddContact = { contact ->
+                        healthData.value.emergencyContacts.add(contact)
+                    }
+                )
+            }
+        }
+    }
+}
+
+sealed class Screen {
+    object Login : Screen()
+    object Dashboard : Screen()
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LoginScreen(
+    users: List<User>,
+    onLoginSuccess: (User) -> Unit
+) {
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+    var selectedRole by remember { mutableStateOf(UserRole.ELDER) }
+    var errorMessage by remember { mutableStateOf("") }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF6200EE),
+                        Color(0xFF03DAC6)
+                    )
+                )
+            )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Favorite,
+                contentDescription = "Health Monitor",
+                modifier = Modifier.size(80.dp),
+                tint = Color.White
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Elder Health Monitor",
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "Care for your loved ones",
+                fontSize = 16.sp,
+                color = Color.White.copy(alpha = 0.8f)
+            )
+
+            Spacer(modifier = Modifier.height(48.dp))
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Sign In",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        RoleButton(
+                            text = "Elder",
+                            icon = Icons.Default.Person,
+                            selected = selectedRole == UserRole.ELDER,
+                            onClick = { selectedRole = UserRole.ELDER }
+                        )
+                        RoleButton(
+                            text = "Guardian",
+                            icon = Icons.Default.AccountCircle,
+                            selected = selectedRole == UserRole.GUARDIAN,
+                            onClick = { selectedRole = UserRole.GUARDIAN }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    OutlinedTextField(
+                        value = username,
+                        onValueChange = { username = it },
+                        label = { Text("Username") },
+                        leadingIcon = {
+                            Icon(Icons.Default.Person, contentDescription = null)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        label = { Text("Password") },
+                        leadingIcon = {
+                            Icon(Icons.Default.Lock, contentDescription = null)
+                        },
+                        trailingIcon = {
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(
+                                    imageVector = if (passwordVisible) Icons.Default.KeyboardArrowUp
+                                    else Icons.Default.KeyboardArrowDown,
+                                    contentDescription = "Toggle password"
+                                )
+                            }
+                        },
+                        visualTransformation = if (passwordVisible) VisualTransformation.None
+                        else PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    if (errorMessage.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = errorMessage,
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 14.sp
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Button(
+                        onClick = {
+                            val user = users.find {
+                                it.username == username &&
+                                        it.password == password &&
+                                        it.role == selectedRole
+                            }
+                            if (user != null) {
+                                onLoginSuccess(user)
+                            } else {
+                                errorMessage = "Invalid credentials or wrong role"
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Login", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "Demo: elder1/elder123 or guardian1/guard123",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.outline,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun RoleButton(
+    text: String,
+    icon: ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Button(
+        onClick = onClick,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (selected) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.surface,
+            contentColor = if (selected) Color.White
+            else MaterialTheme.colorScheme.onSurface
+        ),
+        border = if (!selected) BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null,
+        modifier = Modifier.width(140.dp)
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(text)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DashboardScreen(
+    user: User,
+    healthData: HealthData,
+    onLogout: () -> Unit,
+    onUpdateWater: (Int) -> Unit,
+    onUpdateSteps: (Int) -> Unit,
+    onUpdateHeartRate: (Int) -> Unit,
+    onAddContact: (EmergencyContact) -> Unit
+) {
+    var showAddContactDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (!isGranted) {
+            // Handle permission denied
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text("Health Monitor")
+                        Text(
+                            text = "Welcome, ${user.name}",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Normal
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onLogout) {
+                        Icon(Icons.Default.ExitToApp, contentDescription = "Logout")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = Color.White,
+                    actionIconContentColor = Color.White
+                )
+            )
+        }
+    ) { paddingValues ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            item {
+                DateTimeCard()
+            }
+
+            item {
+                WaterIntakeCard(
+                    currentIntake = healthData.waterIntake,
+                    onUpdate = onUpdateWater,
+                    isEditable = user.role == UserRole.ELDER
+                )
+            }
+
+            item {
+                StepsCard(
+                    currentSteps = healthData.steps,
+                    onUpdate = onUpdateSteps,
+                    isEditable = user.role == UserRole.ELDER
+                )
+            }
+
+            item {
+                HeartRateCard(
+                    heartRate = healthData.heartRate,
+                    onUpdate = onUpdateHeartRate,
+                    isEditable = user.role == UserRole.ELDER
+                )
+            }
+
+            item {
+                EmergencyContactsCard(
+                    contacts = healthData.emergencyContacts,
+                    onAddContact = { showAddContactDialog = true },
+                    onCallContact = { phoneNumber ->
+                        if (ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.CALL_PHONE
+                            ) == PackageManager.PERMISSION_GRANTED
+                        ) {
+                            val intent = Intent(Intent.ACTION_CALL).apply {
+                                data = Uri.parse("tel:$phoneNumber")
+                            }
+                            context.startActivity(intent)
+                        } else {
+                            permissionLauncher.launch(Manifest.permission.CALL_PHONE)
+                        }
+                    }
+                )
+            }
+
+            item {
+                SOSButton(
+                    contacts = healthData.emergencyContacts,
+                    onSOS = { phoneNumber ->
+                        if (ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.CALL_PHONE
+                            ) == PackageManager.PERMISSION_GRANTED
+                        ) {
+                            val intent = Intent(Intent.ACTION_CALL).apply {
+                                data = Uri.parse("tel:$phoneNumber")
+                            }
+                            context.startActivity(intent)
+                        } else {
+                            permissionLauncher.launch(Manifest.permission.CALL_PHONE)
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    if (showAddContactDialog) {
+        AddContactDialog(
+            onDismiss = { showAddContactDialog = false },
+            onAdd = { contact ->
+                onAddContact(contact)
+                showAddContactDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun DateTimeCard() {
+    val currentTime = remember {
+        SimpleDateFormat("EEEE, MMMM dd, yyyy - hh:mm a", Locale.getDefault())
+            .format(Date())
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Default.DateRange,
+                contentDescription = null,
+                modifier = Modifier.size(40.dp),
+                tint = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(
+                text = currentTime,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        }
+    }
+}
+
+@Composable
+fun WaterIntakeCard(
+    currentIntake: Int,
+    onUpdate: (Int) -> Unit,
+    isEditable: Boolean
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.Face,
+                    contentDescription = null,
+                    modifier = Modifier.size(32.dp),
+                    tint = Color(0xFF2196F3)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "Water Intake",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "$currentIntake / 8 glasses",
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            LinearProgressIndicator(
+                progress = (currentIntake / 8f).coerceIn(0f, 1f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp)),
+                color = Color(0xFF2196F3)
+            )
+
+            if (isEditable) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { if (currentIntake > 0) onUpdate(currentIntake - 1) },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("- Glass")
+                    }
+                    Button(
+                        onClick = { if (currentIntake < 12) onUpdate(currentIntake + 1) },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("+ Glass")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun StepsCard(
+    currentSteps: Int,
+    onUpdate: (Int) -> Unit,
+    isEditable: Boolean
+) {
+    val goal = 10000
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.Star,
+                    contentDescription = null,
+                    modifier = Modifier.size(32.dp),
+                    tint = Color(0xFF4CAF50)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "Steps Today",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "$currentSteps / $goal steps",
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            LinearProgressIndicator(
+                progress = (currentSteps / goal.toFloat()).coerceIn(0f, 1f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp)),
+                color = Color(0xFF4CAF50)
+            )
+
+            if (isEditable) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { if (currentSteps >= 100) onUpdate(currentSteps - 100) },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("-100")
+                    }
+                    Button(
+                        onClick = { onUpdate(currentSteps + 100) },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("+100")
+                    }
+                    Button(
+                        onClick = { onUpdate(currentSteps + 1000) },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("+1000")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun HeartRateCard(
+    heartRate: Int,
+    onUpdate: (Int) -> Unit,
+    isEditable: Boolean
+) {
+    val heartRateStatus = when {
+        heartRate < 60 -> Pair("Low", Color(0xFF2196F3))
+        heartRate in 60..100 -> Pair("Normal", Color(0xFF4CAF50))
+        else -> Pair("High", Color(0xFFFF9800))
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.Favorite,
+                    contentDescription = null,
+                    modifier = Modifier.size(32.dp),
+                    tint = Color(0xFFE91E63)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "Heart Rate",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                verticalAlignment = Alignment.Bottom
+            ) {
+                Text(
+                    text = "$heartRate",
+                    fontSize = 48.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "BPM",
+                    fontSize = 20.sp,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = heartRateStatus.second.copy(alpha = 0.2f)
+                )
+            ) {
+                Text(
+                    text = heartRateStatus.first,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    color = heartRateStatus.second,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            if (isEditable) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { if (heartRate > 40) onUpdate(heartRate - 1) },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("-1")
+                    }
+                    Button(
+                        onClick = { if (heartRate < 200) onUpdate(heartRate + 1) },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("+1")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EmergencyContactsCard(
+    contacts: List<EmergencyContact>,
+    onAddContact: () -> Unit,
+    onCallContact: (String) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Person,
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp),
+                        tint = Color(0xFFFF5722)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "Emergency Contacts",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                IconButton(onClick = onAddContact) {
+                    Icon(Icons.Default.Add, contentDescription = "Add Contact")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (contacts.isEmpty()) {
+                Text(
+                    text = "No emergency contacts added yet",
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            } else {
+                contacts.forEach { contact ->
+                    ContactItem(
+                        contact = contact,
+                        onCall = { onCallContact(contact.phoneNumber) }
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ContactItem(
+    contact: EmergencyContact,
+    onCall: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = contact.name.first().toString(),
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = contact.name,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                    Text(
+                        text = contact.relationship,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                    Text(
+                        text = contact.phoneNumber,
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            IconButton(
+                onClick = onCall,
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF4CAF50))
+            ) {
+                Icon(
+                    Icons.Default.Phone,
+                    contentDescription = "Call",
+                    tint = Color.White
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun SOSButton(
+    contacts: List<EmergencyContact>,
+    onSOS: (String) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFFF1744)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Button(
+                onClick = {
+                    if (contacts.isNotEmpty()) {
+                        onSOS(contacts.first().phoneNumber)
+                    }
+                },
+                modifier = Modifier
+                    .size(120.dp)
+                    .clip(CircleShape),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.White,
+                    contentColor = Color(0xFFFF1744)
+                ),
+                enabled = contacts.isNotEmpty()
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        Icons.Default.Warning,
+                        contentDescription = "SOS",
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Text(
+                        text = "SOS",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = if (contacts.isNotEmpty())
+                    "Emergency call to ${contacts.first().name}"
+                else
+                    "Add emergency contact first",
+                color = Color.White,
+                textAlign = TextAlign.Center,
+                fontSize = 14.sp
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddContactDialog(
+    onDismiss: () -> Unit,
+    onAdd: (EmergencyContact) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var phoneNumber by remember { mutableStateOf("") }
+    var relationship by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add Emergency Contact") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = phoneNumber,
+                    onValueChange = { phoneNumber = it },
+                    label = { Text("Phone Number") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = relationship,
+                    onValueChange = { relationship = it },
+                    label = { Text("Relationship (e.g., Son, Daughter)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (name.isNotBlank() && phoneNumber.isNotBlank() && relationship.isNotBlank()) {
+                        onAdd(EmergencyContact(name, phoneNumber, relationship))
+                    }
+                }
+            ) {
+                Text("Add")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+/*
+==========================================
+ANDROIDMANIFEST.XML
+==========================================
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="Elder Health Monitor"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar"
+        tools:targetApi="31">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Material.Light.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
+
+==========================================
+BUILD.GRADLE.KTS (Module: app)
+==========================================
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+}
+
+android {
+    namespace = "com.example.elderhealthmonitor"
+    compileSdk = 34
+
+    defaultConfig {
+        applicationId = "com.example.elderhealthmonitor"
+        minSdk = 24
+        targetSdk = 34
+        versionCode = 1
+        versionName = "1.0"
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+
+    buildFeatures {
+        compose = true
+    }
+
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.1"
+    }
+
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+}
+
+dependencies {
+    implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+    implementation("androidx.activity:activity-compose:1.8.2")
+    implementation(platform("androidx.compose:compose-bom:2024.02.00"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-graphics")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.foundation:foundation")
+}
+*/
